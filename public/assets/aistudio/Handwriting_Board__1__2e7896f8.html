@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Handwriting Board</title>
+<style>
+  :root {
+    --bg: #fff7fb; --ink: #2d3436; --purple: #6c5ce7; --soft: #a29bfe; --line: #e6defa;
+    --paper: #ffffff; --paper-dark: #1f2230;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: light; } }
+  *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; background: var(--bg); color: var(--ink);
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, -apple-system, sans-serif;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body { display: flex; flex-direction: column; position: relative; }
+
+  /* top bar */
+  .top { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 10px 4px; }
+  .sp { flex: 1; }
+  .ib {
+    width: 46px; height: 46px; border-radius: 16px; border: 2px solid var(--line); background: #fff; color: var(--purple);
+    display: grid; place-items: center; cursor: pointer; padding: 0; transition: transform .1s, background .15s;
+  }
+  .ib:active { transform: scale(.92); }
+  .ib:disabled { opacity: .4; }
+  .ib svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .ib[aria-pressed="true"] { background: #ffeaa7; border-color: #fdcb6e; color: #b7791f; }
+  .colorbtn {
+    height: 46px; border-radius: 16px; border: 2px solid var(--line); background: #fff; display: flex; align-items: center;
+    gap: 6px; padding: 0 12px 0 8px; cursor: pointer; color: var(--purple);
+  }
+  .colorbtn i { width: 28px; height: 28px; border-radius: 9px 9px 9px 2px; transform: rotate(-45deg) scale(.9); background: #2d3436; box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--line); }
+  .colorbtn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* colour picker dialog */
+  .pscrim { position: fixed; inset: 0; z-index: 70; background: rgba(20,22,30,.55); display: none; }
+  .pscrim.open { display: block; }
+  .picker { position: fixed; z-index: 71; left: 50%; top: 50%; transform: translate(-50%, -50%); display: none;
+    width: min(92vw, 380px); max-height: 96vh; overflow-y: auto; background: #343b43; color: #dfe4ea; border-radius: 18px;
+    padding: 28px 28px 14px; box-shadow: 0 18px 50px rgba(0,0,0,.5); }
+  .picker.open { display: block; }
+  .pbody { display: flex; gap: 22px; justify-content: center; }
+  .sv { position: relative; width: min(60vw, 250px); height: min(60vw, 250px); touch-action: none; cursor: crosshair; border-radius: 4px; }
+  .hue { position: relative; width: 30px; height: min(60vw, 250px); touch-action: none; border-radius: 4px; cursor: pointer;
+    background: linear-gradient(to bottom, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
+  .thumb { position: absolute; width: 28px; height: 28px; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none;
+    border: 3px solid #e4e4e4; box-shadow: 0 1px 6px rgba(0,0,0,.55); }
+  .prow { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 20px; font-weight: 700; letter-spacing: .5px; }
+  .pchip { width: 34px; height: 34px; border-radius: 10px; border: 2px solid #8793a0; }
+  .presets { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 14px; }
+  .ps { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #5b6672; padding: 0; cursor: pointer; }
+  .pact { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+  .pact button { border: 0; background: none; font: inherit; font-weight: 700; letter-spacing: .6px; color: #a8b3c0; padding: 12px 16px; cursor: pointer; border-radius: 10px; }
+  .pact button.ok { color: #c4bcff; }
+  .pact button:active { background: rgba(255,255,255,.08); }
+
+  /* drawer */
+  .scrim { position: absolute; inset: 0; z-index: 40; background: rgba(45,52,54,.35); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+  .drawer {
+    position: absolute; z-index: 50; top: 0; bottom: 0; left: 0; width: min(82vw, 310px); background: #fff; border-radius: 0 26px 26px 0;
+    padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+    transform: translateX(-105%); transition: transform .25s ease; box-shadow: 8px 0 30px rgba(60,40,140,.25);
+    display: flex; flex-direction: column; gap: 12px; overflow-y: auto;
+  }
+  .drawer.open { transform: none; }
+  .drawer h2 { margin: 0 0 2px; font-size: 1.05rem; color: var(--purple); display: flex; justify-content: space-between; align-items: center; }
+  .card { background: #f7f4ff; border: 2px solid var(--line); border-radius: 18px; padding: 12px 14px; }
+  .card small { display: block; font-weight: 700; margin-bottom: 8px; color: #636e72; }
+  .sizerow { display: flex; align-items: center; gap: 12px; }
+  .pv { width: 34px; height: 34px; display: grid; place-items: center; flex: none; }
+  .pv i { display: block; border-radius: 50%; width: 8px; height: 8px; background: #2d3436; }
+  input[type=range] { flex: 1; min-width: 0; accent-color: var(--purple); height: 30px; }
+  .val { width: 26px; text-align: right; font-weight: 700; }
+  .row {
+    display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 14px; border-radius: 18px; border: 2px solid var(--line);
+    background: #fff; font: inherit; font-weight: 700; color: var(--ink); cursor: pointer; text-align: left; width: 100%;
+  }
+  .row:active { background: #f1edff; }
+  .row .e { font-size: 1.3rem; width: 28px; text-align: center; }
+  .seg { display: flex; background: #fff; border: 2px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .seg button { flex: 1; border: 0; background: none; font: inherit; font-weight: 700; padding: 10px 0; cursor: pointer; color: #636e72; }
+  .seg button[aria-pressed="true"] { background: var(--purple); color: #fff; }
+  .file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+
+  /* canvas */
+  .stage { flex: 1; min-height: 0; padding: 4px 6px 8px; display: flex; }
+  .box { flex: 1; position: relative; background: var(--paper); border: 3px dashed var(--soft); border-radius: 20px;
+    box-shadow: 0 6px 18px rgba(108,92,231,.2); overflow: hidden; touch-action: none; transition: background .25s; }
+  .box.dark { background: var(--paper-dark); }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; background: transparent; }
+  .toast { position: fixed; z-index: 60; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px);
+    background: var(--ink); color: #fff; padding: 9px 16px; border-radius: 999px; font-size: .9rem; opacity: 0; pointer-events: none; transition: all .25s; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---- playful kid theme (overrides) ---- */
+  html, body { font-family: "Chalkboard SE","Comic Neue","Comic Sans MS","Trebuchet MS",system-ui,sans-serif;
+    background: linear-gradient(160deg,#ffe9f5 0%,#e9f1ff 55%,#e3fff4 100%); background-attachment: fixed; }
+  .top { position: relative; padding: 10px 12px 12px; gap: 9px; }
+  .top::after { content: ""; position: absolute; left: 16px; right: 16px; bottom: 3px; height: 5px; border-radius: 5px;
+    background: linear-gradient(90deg,#e17055,#fdcb6e,#00b894,#0984e3,#6c5ce7); }
+  .ib { width: 50px; height: 50px; border-radius: 18px; border: 0; border-bottom: 5px solid rgba(0,0,0,.18); transition: transform .08s, border-width .08s; }
+  .ib:active { transform: translateY(3px); border-bottom-width: 2px; }
+  .ib svg { width: 26px; height: 26px; stroke-width: 2.8; }
+  #menu { background: #d9d3ff; color: #4b3fc9; }
+  #eraser { background: #fff2b8; color: #a06a00; }
+  #undo { background: #cfe8ff; color: #0b62b5; }
+  #clear { background: #ffd6d0; color: #c0392b; }
+  #eraser[aria-pressed="true"] { background: #ffd54a; color: #7a4d00; box-shadow: 0 0 0 3px #fff, 0 0 0 6px #ffb300; }
+  .colorbtn { height: 50px; border-radius: 18px; border: 0; border-bottom: 5px solid rgba(0,0,0,.18); background: #fff; padding: 0 14px 0 12px; }
+  .colorbtn:active { transform: translateY(3px); border-bottom-width: 2px; }
+  .colorbtn i { width: 28px; height: 28px; box-shadow: 0 0 0 3px #fff, 0 0 0 6px #b8a9ff; }
+
+  .stage { padding: 6px 12px 14px; }
+  .box { border: 3px dashed #b8a9ff; border-radius: 28px; box-shadow: 0 0 0 7px #fff, 0 12px 26px rgba(108,92,231,.28); }
+
+  .drawer { background: linear-gradient(180deg,#ffffff,#f6f1ff); border-radius: 0 32px 32px 0; gap: 14px; }
+  .drawer h2 { font-size: 1.4rem; margin-bottom: 4px; }
+  .card { border-radius: 22px; }
+  .card small { font-size: .95rem; color: #4a4f55; }
+  .card:nth-of-type(1) { background: #fff3d6; border-color: #ffd98a; }
+  .card:nth-of-type(2) { background: #e6f6ff; border-color: #a9d8ff; }
+  .seg { border-radius: 18px; border-color: #a9d8ff; }
+  .seg button { padding: 12px 0; font-size: 1rem; }
+  .seg button[aria-pressed="true"] { background: linear-gradient(135deg,#a29bfe,#6c5ce7); }
+  .row { min-height: 60px; border: 0; border-bottom: 5px solid rgba(0,0,0,.15); border-radius: 22px; font-size: 1.08rem; transition: transform .08s, border-width .08s; }
+  .row:active { transform: translateY(3px); border-bottom-width: 2px; }
+  .row .e { font-size: 1.7rem; width: 34px; }
+  label.row { background: #ffe5c2; }
+  #save { background: #c9f5e2; }
+  #share { background: #d4e8ff; }
+
+  .picker { background: linear-gradient(160deg,#4a3f8f,#2f2a5e); color: #fff; border-radius: 30px; padding-top: 24px; }
+  .ptitle { text-align: center; font-weight: 700; font-size: 1.2rem; margin-bottom: 22px; }
+  .sv, .hue { border-radius: 14px; }
+  .thumb { width: 32px; height: 32px; border: 4px solid #fff; }
+  .pchip { border-color: #fff; }
+  .ps { width: 32px; height: 32px; border: 3px solid #fff; }
+  .pact button { border-radius: 999px; padding: 12px 22px; background: rgba(255,255,255,.16); color: #fff; }
+  .pact button.ok { background: #00b894; color: #fff; }
+  .toast { background: #6c5ce7; font-weight: 700; box-shadow: 0 6px 18px rgba(108,92,231,.4); }
+</style>
+</head>
+<body>
+  <div class="top">
+    <button class="ib" id="menu" aria-label="Open menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h11M4 17h16"/></svg></button>
+    <button class="colorbtn" id="colorBtn" aria-label="Choose colour"><i id="chip"></i><svg viewBox="0 0 14 14"><path d="M3 5l4 4 4-4"/></svg></button>
+    <button class="ib" id="eraser" aria-pressed="false" aria-label="Eraser"><svg viewBox="0 0 24 24"><path d="M8 19h11M5.5 14.5l8-8a2.1 2.1 0 013 0l2 2a2.1 2.1 0 010 3l-6 6H9.5l-4-4a1.4 1.4 0 010-1z"/></svg></button>
+    <div class="sp"></div>
+    <button class="ib" id="undo" disabled aria-label="Undo"><svg viewBox="0 0 24 24"><path d="M9 8L5 12l4 4M5 12h9a5 5 0 010 10h-2" transform="translate(0 -3)"/></svg></button>
+    <button class="ib" id="clear" aria-label="Clear screen"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12M10 11v5M14 11v5"/></svg></button>
+  </div>
+
+  <div class="pscrim" id="pscrim"></div>
+  <div class="picker" id="picker" role="dialog" aria-label="Choose a colour">
+    <div class="ptitle">Pick a colour 🎨</div>
+    <div class="pbody">
+      <div class="sv" id="sv"><i class="thumb" id="svThumb"></i></div>
+      <div class="hue" id="hue"><i class="thumb" id="hueThumb"></i></div>
+    </div>
+    <div class="prow"><span class="pchip" id="pchip"></span><span id="phex">#000000</span></div>
+    <div class="presets" id="presets"></div>
+    <div class="pact"><button id="pCancel">CANCEL</button><button class="ok" id="pOk">OK</button></div>
+  </div>
+
+  <div class="stage"><div class="box" id="box"><canvas id="board"></canvas></div></div>
+
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer" aria-label="Tools">
+    <h2>✏️ My tools</h2>
+    <div class="card">
+      <small>✏️ Pencil size</small>
+      <div class="sizerow">
+        <div class="pv" aria-hidden="true"><i id="dot"></i></div>
+        <input type="range" id="size" min="2" max="30" value="8" aria-label="Pencil size">
+        <span class="val" id="sizeVal">8</span>
+      </div>
+    </div>
+    <div class="card">
+      <small>🎨 Paper</small>
+      <div class="seg"><button id="lightB" aria-pressed="true">☀️ Light</button><button id="darkB" aria-pressed="false">🌙 Dark</button></div>
+    </div>
+    <label class="row" for="file"><span class="e">🖼️</span>Add a picture</label>
+    <input class="file" type="file" id="file" accept="image/*">
+    <button class="row" id="save"><span class="e">💾</span>Save as PNG</button>
+    <button class="row" id="share"><span class="e">📤</span>Share</button>
+  </aside>
+  <div class="toast" id="toast" role="status"></div>
+
+<script>
+(function () {
+  'use strict';
+  var COLORS = ['#2d3436','#636e72','#b2bec3','#ffffff','#d63031','#e17055','#fab1a0','#fd79a8','#e84393',
+                '#fdcb6e','#f1c40f','#ffeaa7','#00b894','#55efc4','#6ab04c','#0984e3','#74b9ff','#00cec9',
+                '#6c5ce7','#a29bfe','#8d5524'];
+  var PAPER = { light: '#ffffff', dark: '#1f2230' };
+  var $ = function (id) { return document.getElementById(id); };
+  var canvas = $('board'), box = $('box'), ctx = canvas.getContext('2d');
+  var eraserBtn = $('eraser'), undoBtn = $('undo');
+  var drawer = $('drawer'), scrim = $('scrim');
+
+  var color = '#2d3436', size = 8, erasing = false, dark = false;
+  var drawing = false, last = null, mid = null, history = [], MAX_HISTORY = 20;
+  var dpr = Math.max(window.devicePixelRatio || 1, 1), cssW = 0, cssH = 0;
+
+  function toast(m) { var t = $('toast'); t.textContent = m; t.classList.add('show');
+    clearTimeout(toast.t); toast.t = setTimeout(function () { t.classList.remove('show'); }, 2000); }
+
+  /* ---------- colour picker dialog ---------- */
+  var H = 0, S = 0, V = 0;
+  var dlg = $('picker'), pscrim = $('pscrim'), sv = $('sv'), hueEl = $('hue');
+  function toHex(r, g, b) { return '#' + [r, g, b].map(function (x) { var t = Math.round(x * 255).toString(16); return t.length < 2 ? '0' + t : t; }).join(''); }
+  function hsv2hex(h, s, v) {
+    var c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c, r = 0, g = 0, b = 0;
+    if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; } else if (h < 180) { g = c; b = x; }
+    else if (h < 240) { g = x; b = c; } else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
+    return toHex(r + m, g + m, b + m);
+  }
+  function hex2hsv(hex) {
+    var n = parseInt(hex.slice(1), 16), r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, h = H;
+    if (d > 0) { if (mx === r) h = 60 * (((g - b) / d) % 6); else if (mx === g) h = 60 * ((b - r) / d + 2); else h = 60 * ((r - g) / d + 4); if (h < 0) h += 360; }
+    H = h; S = mx === 0 ? 0 : d / mx; V = mx;
+  }
+  function render() {
+    var hx = hsv2hex(H, S, V), pure = 'hsl(' + H + ',100%,50%)';
+    sv.style.background = 'linear-gradient(to top,#000,rgba(0,0,0,0)),linear-gradient(to right,#fff,' + pure + ')';
+    $('svThumb').style.left = S * 100 + '%'; $('svThumb').style.top = (1 - V) * 100 + '%'; $('svThumb').style.background = hx;
+    $('hueThumb').style.left = '50%'; $('hueThumb').style.top = H / 360 * 100 + '%'; $('hueThumb').style.background = pure;
+    $('pchip').style.background = hx; $('phex').textContent = hx.toUpperCase();
+    return hx;
+  }
+  function drag(el, fn) {
+    function f(e) {
+      var r = el.getBoundingClientRect();
+      fn(Math.min(Math.max((e.clientX - r.left) / r.width, 0), 1), Math.min(Math.max((e.clientY - r.top) / r.height, 0), 1)); render();
+    }
+    el.addEventListener('pointerdown', function (e) { e.preventDefault(); el.setPointerCapture(e.pointerId); f(e); el.onpointermove = f; });
+    function up() { el.onpointermove = null; }
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  }
+  drag(sv, function (x, y) { S = x; V = 1 - y; });
+  drag(hueEl, function (x, y) { H = Math.min(y * 360, 359.99); });
+  COLORS.forEach(function (c) {
+    var b = document.createElement('button'); b.className = 'ps'; b.style.background = c; b.setAttribute('aria-label', 'Colour ' + c);
+    b.addEventListener('click', function () { hex2hsv(c); render(); });
+    $('presets').appendChild(b);
+  });
+  function setColor(c) {
+    color = c; erasing = false; eraserBtn.setAttribute('aria-pressed', 'false');
+    $('chip').style.background = c; updateDot();
+  }
+  function pickerOpen(o) { dlg.classList.toggle('open', o); pscrim.classList.toggle('open', o); }
+  $('colorBtn').addEventListener('click', function () { hex2hsv(color); render(); pickerOpen(true); });
+  $('pOk').addEventListener('click', function () { setColor(render()); pickerOpen(false); });
+  $('pCancel').addEventListener('click', function () { pickerOpen(false); });
+  pscrim.addEventListener('click', function () { pickerOpen(false); });
+
+  /* ---------- drawer ---------- */
+  function drawerOpen(o) { drawer.classList.toggle('open', o); scrim.classList.toggle('open', o); }
+  $('menu').addEventListener('click', function () { drawerOpen(true); });
+  scrim.addEventListener('click', function () { drawerOpen(false); });
+
+  /* ---------- canvas (transparent layer over CSS paper) ---------- */
+  function clearAll() { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.restore(); }
+  function setupCanvas() {
+    var r = box.getBoundingClientRect();
+    var w = Math.max(Math.round(r.width - 6), 50), h = Math.max(Math.round(r.height - 6), 50);
+    if (w === cssW && h === cssH && dpr === (window.devicePixelRatio || 1)) return;
+    dpr = Math.max(window.devicePixelRatio || 1, 1);
+    var keep = null;
+    if (cssW && canvas.width) { keep = document.createElement('canvas'); keep.width = canvas.width; keep.height = canvas.height; keep.getContext('2d').drawImage(canvas, 0, 0); }
+    cssW = w; cssH = h; canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (keep) ctx.drawImage(keep, 0, 0, keep.width / dpr, keep.height / dpr);
+  }
+
+  /* ---------- history: last 20 via toDataURL ---------- */
+  function pushState() { try { history.push(canvas.toDataURL('image/png')); } catch (e) { return; }
+    if (history.length > MAX_HISTORY) history.shift(); undoBtn.disabled = history.length <= 1; }
+  function undo() {
+    if (history.length <= 1) return;
+    history.pop(); var img = new Image();
+    img.onload = function () { clearAll(); ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height); ctx.restore(); };
+    img.src = history[history.length - 1]; undoBtn.disabled = history.length <= 1;
+  }
+
+  /* ---------- drawing ---------- */
+  function pos(e) { var r = canvas.getBoundingClientRect(), p = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+    return { x: p.clientX - r.left, y: p.clientY - r.top }; }
+  function style() { ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = size;
+    ctx.globalCompositeOperation = erasing ? 'destination-out' : 'source-over'; ctx.strokeStyle = ctx.fillStyle = erasing ? '#000' : color; }
+  function start(e) { e.preventDefault(); drawing = true; style(); last = pos(e); mid = last;
+    ctx.beginPath(); ctx.arc(last.x, last.y, size / 2, 0, Math.PI * 2); ctx.fill(); }
+  function move(e) { if (!drawing) return; e.preventDefault();
+    var p = pos(e), m = { x: (last.x + p.x) / 2, y: (last.y + p.y) / 2 };
+    ctx.beginPath(); ctx.moveTo(mid.x, mid.y); ctx.quadraticCurveTo(last.x, last.y, m.x, m.y); ctx.stroke(); last = p; mid = m; }
+  function end(e) { if (e) e.preventDefault(); if (!drawing) return; drawing = false;
+    ctx.beginPath(); ctx.moveTo(mid.x, mid.y); ctx.lineTo(last.x, last.y); ctx.stroke(); pushState(); }
+  var opt = { passive: false };
+  canvas.addEventListener('touchstart', start, opt); canvas.addEventListener('touchmove', move, opt);
+  canvas.addEventListener('touchend', end, opt); canvas.addEventListener('touchcancel', end, opt);
+  canvas.addEventListener('mousedown', start); window.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', function (e) { if (drawing) end(e); });
+  document.addEventListener('touchmove', function (e) { if (e.target === canvas) e.preventDefault(); }, opt);
+  document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  /* ---------- controls ---------- */
+  function updateDot() { var d = $('dot'); d.style.width = d.style.height = size + 'px';
+    d.style.background = erasing ? '#b2bec3' : color; d.style.boxShadow = (color === '#ffffff' && !erasing) ? '0 0 0 1px #b2bec3' : 'none'; }
+  $('size').addEventListener('input', function () { size = +this.value; $('sizeVal').textContent = size; updateDot(); });
+  eraserBtn.addEventListener('click', function () { erasing = !erasing; this.setAttribute('aria-pressed', String(erasing)); updateDot(); });
+  undoBtn.addEventListener('click', undo);
+  $('clear').addEventListener('click', function () { clearAll(); pushState(); });
+
+  function setMode(d) {
+    dark = d; box.classList.toggle('dark', d);
+    $('lightB').setAttribute('aria-pressed', String(!d)); $('darkB').setAttribute('aria-pressed', String(d));
+    if (d && color === '#2d3436') setColor('#ffffff', true); else if (!d && color === '#ffffff') setColor('#2d3436', true);
+  }
+  $('lightB').addEventListener('click', function () { setMode(false); });
+  $('darkB').addEventListener('click', function () { setMode(true); });
+
+  /* ---------- picture upload (label-driven file input, two decoders) ---------- */
+  function place(src, iw, ih) {
+    var s = Math.min(cssW / iw, cssH / ih), w = iw * s, h = ih * s;
+    ctx.save(); ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(src, (cssW - w) / 2, (cssH - h) / 2, w, h); ctx.restore();
+    pushState(); drawerOpen(false); toast('Picture added');
+  }
+  $('file').addEventListener('change', function () {
+    var input = this, f = input.files && input.files[0];
+    if (!f) return;
+    function viaBitmap() {
+      if (!window.createImageBitmap) { toast('This picture could not be opened'); return; }
+      createImageBitmap(f).then(function (b) { place(b, b.width, b.height); }).catch(function () { toast('This picture could not be opened'); });
+    }
+    var rd = new FileReader();
+    rd.onload = function () {
+      var img = new Image();
+      img.onload = function () { place(img, img.naturalWidth || img.width, img.naturalHeight || img.height); };
+      img.onerror = viaBitmap;
+      img.src = rd.result;
+    };
+    rd.onerror = viaBitmap;
+    rd.readAsDataURL(f);
+    setTimeout(function () { input.value = ''; }, 1500);
+  });
+
+  /* ---------- save / share ---------- */
+  function exportBlob(cb) {
+    var out = document.createElement('canvas'); out.width = canvas.width; out.height = canvas.height;
+    var o = out.getContext('2d'); o.fillStyle = dark ? PAPER.dark : PAPER.light; o.fillRect(0, 0, out.width, out.height); o.drawImage(canvas, 0, 0);
+    out.toBlob(cb, 'image/png');
+  }
+  function fileName() { return 'handwriting-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.png'; }
+  function saveBlob(blob, name) {
+    function fallback() { var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000); toast('Saved!'); }
+    if (window.claude && typeof window.claude.use === 'function') {
+      window.claude.use('downloads').then(function (d) {
+        if (!d) { fallback(); return; }
+        d.save({ filename: name, data: blob }).then(function () { toast('Saved!'); })
+          .catch(function (err) { if (!err || err.code !== 'declined') toast('Could not save'); });
+      }).catch(fallback);
+    } else fallback();
+  }
+  $('save').addEventListener('click', function () { exportBlob(function (b) { if (b) { saveBlob(b, fileName()); drawerOpen(false); } else toast('Could not save'); }); });
+  $('share').addEventListener('click', function () {
+    exportBlob(function (b) {
+      if (!b) { toast('Could not share'); return; }
+      var name = fileName(), file = null;
+      try { file = new File([b], name, { type: 'image/png' }); } catch (e) {}
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: 'My handwriting' }).then(function () { drawerOpen(false); })
+          .catch(function (err) { if (err && err.name === 'AbortError') return; toast('Sharing is blocked here, saving instead'); saveBlob(b, name); });
+      } else { toast('Sharing is not available here, saving instead'); saveBlob(b, name); }
+    });
+  });
+
+  /* ---------- init ---------- */
+  var rT; function onResize() { clearTimeout(rT); rT = setTimeout(setupCanvas, 120); }
+  window.addEventListener('resize', onResize); window.addEventListener('orientationchange', onResize);
+  if (window.ResizeObserver) new ResizeObserver(onResize).observe(box);
+  setColor(color, true); setupCanvas(); pushState();
+})();
+</script>
+</body>
+</html>

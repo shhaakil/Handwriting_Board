@@ -1,0 +1,37 @@
+<resources>
+    <string name="app_name">Handwriting Board</string>
+
+    <!-- Accessibility / Content Descriptions -->
+    <string name="cd_open_menu">Open tools menu</string>
+    <string name="cd_choose_colour">Choose colour</string>
+    <string name="cd_eraser">Eraser</string>
+    <string name="cd_undo">Undo</string>
+    <string name="cd_clear_screen">Clear screen</string>
+    <string name="cd_drawing_canvas">Handwriting and drawing canvas</string>
+
+    <!-- Tools Drawer -->
+    <string name="tools_title">My tools</string>
+    <string name="pencil_size_label">Pencil size</string>
+    <string name="paper_label">Paper</string>
+    <string name="paper_light">Light</string>
+    <string name="paper_dark">Dark</string>
+    <string name="action_add_picture">Add a picture</string>
+    <string name="action_save_png">Save as PNG</string>
+    <string name="action_share">Share</string>
+
+    <!-- Colour Picker Dialog -->
+    <string name="picker_title">Pick a colour</string>
+    <string name="picker_cancel">CANCEL</string>
+    <string name="picker_ok">OK</string>
+    <string name="cd_sv_panel">Saturation and brightness picker</string>
+    <string name="cd_hue_slider">Hue slider</string>
+    <string name="cd_preset_swatch">Colour preset %1$s</string>
+
+    <!-- Status Messages -->
+    <string name="msg_picture_added">Picture added!</string>
+    <string name="msg_picture_failed">This picture could not be opened</string>
+    <string name="msg_saved_png">Saved to Pictures!</string>
+    <string name="msg_save_failed">Could not save drawing</string>
+    <string name="msg_share_failed">Could not share drawing</string>
+    <string name="share_chooser_title">Share my handwriting</string>
+</resources>
